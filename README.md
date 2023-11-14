@@ -1,20 +1,5 @@
 # gpt-helper
 
-A helper based on [OpenAI Assistants API](https://platform.openai.com/docs/assistants/overview) to manage 
-assistants, threads and files, and to interact with ChatGPT via specified assistant and thread from command line.
-
-## Manage Assistants
-
-### Create an assistant
-
-```bash
-gptctl assistant --create --name 
-```
-
-
-
-# gpt-helper
-
 A command-line interface tool for managing OpenAI GPT assistants, threads, and files.
 It integrates with the OpenAI API to perform various operations such as assistant creation, listing, updating, and deletion,
 as well as thread and file management.
