@@ -4,7 +4,7 @@ from src.libopenai.assistant import *
 # lambda functions
 parse_tools = lambda __tools: [{"type": item} for item in __tools.split(",")] if __tools else None
 parse_assistant_info = lambda \
-    v: f"{v.id}\n\tname = {v.name}\n\tdescription = {v.description}\n\tinstructions = {v.instructions}\n\tmodel = {v.model}\n\ttools = {v.tools}"
+    v: f"{v.id}\n\tname = {v.name}\n\tdescription = {v.description}\n\tinstructions = {v.instructions}\n\tmodel = {v.model}\n\ttools = {v.tools}\n\tfile_ids = {v.file_ids}"
 
 
 class AssistantCommand:
@@ -26,6 +26,7 @@ class AssistantCommand:
         list_group.add_argument("--name", help="name")
         list_group.add_argument("--description", help="description")
         list_group.add_argument("--instructions", help="instructions")
+        list_group.add_argument("--file_ids", help="file ids")
         list_group.add_argument("--model", help="model")
         list_group.add_argument("--tools", help="tools, separated by comma")
 
@@ -33,26 +34,17 @@ class AssistantCommand:
         if args.create:
             check_required_args(args, ["name"])
             logging.info(f"creating assistant: name={args.name}, description={args.description},"
-                  f" model={args.model}, tools={args.tools}")
+                         f" model={args.model}, tools={args.tools}, file_ids={args.file_ids}")
             xargs = parse_valid_assistant_args(args)
-            assistant = openai.beta.assistants.create(**xargs)
+            assistant = create(xargs)
             logging.info(f"created assistant: {parse_assistant_info(assistant)}")
         elif args.list:
-            start_index = ''
-            no = 0
-            while True:
-                logging.debug(f"listing assistants with start_index={start_index}")
-                assistants = openai.beta.assistants.list(after=start_index)
-                for v in assistants:
-                    no += 1
-                    print(f"assistant-{no}: {parse_assistant_info(v)}")
-                if not assistants.has_more:
-                    break
-                else:
-                    start_index = assistants.last_id
+            assistants = get_all()
+            for i, v in enumerate(assistants):
+                print(f"assistant-{i+1}: {parse_assistant_info(v)}")
         elif args.choose:
             # id or name is required
-            check_required_args(args, [("id","name")])
+            check_required_args(args, [("id", "name")])
             condition = {"id": args.id} if args.id else {"name": args.name}
             logging.info(f"choosing assistant: condition={condition}")
             assistant = get_by_id_or_name(id=args.id, name=args.name)
@@ -66,7 +58,7 @@ class AssistantCommand:
             xargs = parse_valid_assistant_args(args)
             xargs["assistant_id"] = assistant_id
             logging.info(f"updating assistant: {xargs}")
-            assistant = openai.beta.assistants.update(**xargs)
+            assistant = update(xargs)
             logging.info(f"updated assistant: {parse_assistant_info(assistant)}")
         elif args.delete:
             assistant_id = get_assistant_id(context, args)
@@ -77,6 +69,7 @@ class AssistantCommand:
             logging.debug(f"deleting assistant: {assistant_id}")
             deleted = delete_if_exists(id=assistant_id)
             if deleted:
+                context.set_assistant_id(None)
                 logging.info(f"deleted assistant: {deleted}")
             else:
                 logging.info(f"assistant {assistant_id} not found")
@@ -96,8 +89,10 @@ def get_assistant_id(context, args):
 
 def parse_valid_assistant_args(args):
     __xargs = {k: v for k, v in vars(args).items()
-               if k in ["name", "description", "model", "tools", "instructions"]
+               if k in ["name", "description", "model", "tools", "instructions", "file_ids"]
                and v is not None}
     if "tools" in __xargs:
         __xargs["tools"] = parse_tools(__xargs["tools"])
+    if "file_ids" in __xargs:
+        __xargs["file_ids"] = __xargs["file_ids"].split(",")
     return __xargs

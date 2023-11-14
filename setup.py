@@ -8,5 +8,6 @@ setup(
         'console_scripts': [
             'gptctl = src.gptctl:main',
         ],
-    }
+    },
+    requires=['tinydb', 'openai', 'yolo-pyutils', 'retry'],
 )

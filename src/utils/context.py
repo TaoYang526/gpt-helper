@@ -72,10 +72,24 @@ class Context:
         return self.get_env().get(LOCAL_ENV_KEY_THREAD_ID)
 
     def set_assistant_id(self, assistant_id):
-        self.add_env_entry(LOCAL_ENV_KEY_ASSISTANT_ID, assistant_id)
+        if assistant_id:
+            self.add_env_entry(LOCAL_ENV_KEY_ASSISTANT_ID, assistant_id)
+        else:
+            env = self.get_env()
+            deleted = env.pop(LOCAL_ENV_KEY_ASSISTANT_ID, None)
+            if deleted:
+                self.__persist_env()
+                logging.info(f"deleted assistant id: {deleted}")
 
     def set_thread_id(self, thread_id):
-        self.add_env_entry(LOCAL_ENV_KEY_THREAD_ID, thread_id)
+        if thread_id:
+            self.add_env_entry(LOCAL_ENV_KEY_THREAD_ID, thread_id)
+        else:
+            env = self.get_env()
+            deleted = env.pop(LOCAL_ENV_KEY_THREAD_ID, None)
+            if deleted:
+                self.__persist_env()
+                logging.info(f"deleted thread id: {deleted}")
 
     def get_home_dir(self):
         return self.__home_dir

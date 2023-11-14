@@ -1,4 +1,6 @@
 import json
+import os
+import logging
 
 
 def check_required_args(args, required_names):
@@ -19,3 +21,16 @@ def save_dict(path, target_dict, encoding="utf-8"):
 
 def load_dict(path, encoding="utf-8"):
     return json.load(open(path, encoding=encoding))
+
+
+def read_files_content_if_exists(files):
+    files_content = ""
+    if files:
+        files = files.split(",")
+        for file in files:
+            if not os.path.exists(file):
+                logging.warning(f"file {file} not exists, skipped")
+                continue
+            with open(file, "r") as f:
+                files_content += f"content of {f.name}:\n{f.read()}\n"
+    return files_content

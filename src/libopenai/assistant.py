@@ -4,7 +4,18 @@ import openai
 
 
 def get_all():
-    return openai.beta.assistants.list()
+    result = []
+    start_index = ''
+    while True:
+        logging.debug(f"listing assistants with start_index={start_index}")
+        assistants = openai.beta.assistants.list(after=start_index)
+        for v in assistants:
+            result.append(v)
+        if not assistants.has_more:
+            break
+        else:
+            start_index = assistants.last_id
+    return result
 
 
 def get_by_name(name):
@@ -38,5 +49,9 @@ def delete_if_exists(id):
     return None
 
 
-def update():
-    pass
+def create(xargs):
+    return openai.beta.assistants.create(**xargs)
+
+
+def update(xargs):
+    return openai.beta.assistants.update(**xargs)

@@ -1,7 +1,8 @@
-import openai
 import logging
 from src.utils.common import *
 import os
+from src.libopenai.file import create, delete, get_all
+
 
 CONF_KEY_PURPOSE = "purpose"
 PURPOSE_FINE_TUNE = "fine-tune"
@@ -33,16 +34,16 @@ class FileCommand:
 
     def execute(self, context, args):
         if args.create:
-            check_required_args(args, ["key", "path"])
+            check_required_args(args, ["path"])
             if not os.path.exists(args.path):
-                exit(f"ERROR: path {args.path} not found")
+                exit(f"ERROR: specified path {args.path} not exists")
             xargs = parse_valid_file_args(args)
             logging.info(f"creating file: {xargs}")
-            file = openai.files.create(**xargs)
-            logging.info(f"created file: key={args.key}, {parse_file_info(file)}")
+            file = create(xargs)
+            logging.info(f"created file: {parse_file_info(file)}")
         elif args.list:
             logging.info(f"listing files...")
-            files = openai.files.list(purpose=args.purpose)
+            files = get_all(purpose=args.purpose)
             for k, v in enumerate(files):
                 print(f"file-{k+1}: {parse_file_info(v)}")
         elif args.delete:
@@ -51,7 +52,7 @@ class FileCommand:
             if user_input != "yes":
                 exit("cancelled")
             print(f"deleting file: {args.id}")
-            deleted = openai.beta.files.delete(file_id=args.id)
+            deleted = delete(file_id=args.id)
             print(f"deleted file: {deleted}")
 
 

@@ -1,13 +1,11 @@
 import logging
 import os.path
-
-import openai
-import time
-
+from src.libopenai.thread import create, update, get_messages, chat
 from src.commands.assistant import get_assistant_id
 from src.utils.common import *
-from retry import retry
 from tinydb import TinyDB, Query
+# readline should be imported to make input content to be editable.
+import readline
 
 THREADS_DATA_FILE = "threads.json"
 
@@ -32,7 +30,7 @@ class ThreadCommand:
         parser.add_argument("--get", action="store_true", help="Action: get specified thread and list messages")
         parser.add_argument("--choose", action="store_true", help="Action: choose specified thread")
         parser.add_argument("--delete", action="store_true", help="Action: delete specified thread")
-        parser.add_argument("--chat", action="store_true", help="Action: chat via specified thread")
+        parser.add_argument("--chat", action="store_true", help="Action: chat via specified assistant and thread")
 
         parser.add_argument("--id", help="thread id")
         parser.add_argument("--assistant_id", help="assistant id")
@@ -41,13 +39,16 @@ class ThreadCommand:
         list_group = parser.add_argument_group("thread info")
         list_group.add_argument("--name", help="specified by user and stored locally, used to locate thread")
         list_group.add_argument("--description", help="description")
+        # chat group
+        chat_group = parser.add_argument_group("chat info")
+        chat_group.add_argument("--files", help="Action: content of readable files will be sent before chatting.")
 
     def execute(self, context, args):
         if args.create:
             check_required_args(args, ["name"])
             metadata = json.loads(args.metadata) if args.metadata else {}
             metadata["name"] = args.name
-            thread = openai.beta.threads.create(messages=[], metadata=args.metadata)
+            thread = create(metadata=args.metadata)
             logging.info(f"created thread: {thread}")
             metadata["id"] = thread.id
             db = self.__get_db(context)
@@ -81,11 +82,11 @@ class ThreadCommand:
             check_required_args(args, ["metadata"])
             metadata = json.loads(args.metadata)
             thread_id = get_thread_id(context, args)
-            thread = openai.beta.threads.update(thread_id=thread_id, metadata=metadata)
+            thread = update(thread_id=thread_id, metadata=metadata)
             logging.info(f"updated thread: {thread}")
         elif args.get:
             thread_id = get_thread_id(context, args)
-            msgs = openai.beta.threads.messages.list(thread_id=thread_id)
+            msgs = get_messages(thread_id=thread_id)
             logging.info(f"got {len(msgs.data)} messages")
             for msg in msgs:
                 print(f"{msg}")
@@ -93,14 +94,18 @@ class ThreadCommand:
             assistant_id = get_assistant_id(context, args)
             thread_id = get_thread_id(context, args)
             logging.info(f"chatting via thread: {thread_id}")
+            files_content = read_files_content_if_exists(args.files)
             while True:
                 prompt = input("You: ")
                 if prompt.strip() == '':
                     continue
+                if files_content:
+                    prompt = f"{files_content}\n\n{prompt}"
+                    files_content = ""
                 try:
                     chat(assistant_id, thread_id, prompt)
                 except Exception as err:
-                    logging.error(f"failed to chat: {err}, please check your network then try again later...")
+                    logging.error(f"failed to chat: [{type(err)}] {err}, please check your network then try again later...")
 
 
 def get_thread_id(context, args):
@@ -111,28 +116,3 @@ def get_thread_id(context, args):
         return thread_id
     exit(f"thread id not found, please specify it via --thread_id or "
          f"choose thread via --choose --name <name> before this operation.")
-
-
-def parse_message_contents(msg):
-    return [f"{v.text.value}" if v.type == 'text' else f"{v}" for v in msg.content]
-
-
-@retry(tries=5, delay=1, backoff=2)
-def chat(assistant_id, thread_id, prompt):
-    msg = openai.beta.threads.messages.create(thread_id=thread_id, content=prompt, role='user', timeout=2)
-    run = openai.beta.threads.runs.create(thread_id=thread_id, assistant_id=assistant_id)
-    while run.status not in ["cancelled", "failed", "completed", "expired"]:
-        logging.debug(f"run: status={run.status}, waiting for AI to complete...")
-        time.sleep(0.5)
-        run = openai.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
-        # msgs = openai.beta.threads.messages.list(thread_id=thread_id, before=msg.id)
-        # print(f"latest msgs={msgs}")
-    # print(f"AI completed, run status: {run}")
-    if run.status == "completed":
-        msgs = openai.beta.threads.messages.list(thread_id=thread_id, before=msg.id)
-        print(f"AI: (responded {len(msgs.data)} messages)" if len(msgs.data) > 1 else "AI:")
-        for msg in msgs:
-            contents = parse_message_contents(msg)
-            print("[END of content]\n".join(contents))
-    else:
-        logging.warn(f"AI ran but got non-completed status, run={run}")
