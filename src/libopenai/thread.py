@@ -5,7 +5,11 @@ import time
 
 
 def create(metadata=None):
-    openai.beta.threads.create(messages=[], metadata=metadata)
+    return openai.beta.threads.create(messages=[], metadata=metadata)
+
+
+def delete(thread_id):
+    return openai.beta.threads.delete(thread_id=thread_id)
 
 
 def update(thread_id, metadata=None):

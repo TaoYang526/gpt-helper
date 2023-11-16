@@ -9,5 +9,5 @@ setup(
             'gptctl = src.gptctl:main',
         ],
     },
-    requires=['tinydb', 'openai', 'yolo-pyutils', 'retry'],
+    install_requires=['tinydb', 'openai', 'yolo-pyutils', 'retry'],
 )

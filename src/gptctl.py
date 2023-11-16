@@ -1,4 +1,6 @@
 import argparse
+import logging
+import traceback
 from src.commands.assistant import AssistantCommand
 from src.commands.thread import ThreadCommand
 from src.commands.files import FileCommand
@@ -45,7 +47,11 @@ def main():
     command_instance = command_instances.get(args.subcommand)
     if not command_instance:
         exit(f'No subcommand {args.subcommand} found.')
-    command_instance.execute(context, args)
+    try:
+        command_instance.execute(context, args)
+    except Exception as err:
+        logging.debug(f'{traceback.format_exc()}')
+        exit(f'ERROR: {repr(err)}')
 
 
 if __name__ == '__main__':

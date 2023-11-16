@@ -40,13 +40,17 @@ export OPENAI_API_KEY='your-api-key-here'
 #### gptctl
 To interact with ChatGPT, run the `gptctl` command with the desired subcommands. Here's how you can use different parts of the tool:
 
-
-##### File Commands
+##### Assistant Commands
 
 ```bash
-gptctl file --create --path <path-to-local-file>
-gptctl file --list
-gptctl file --delete --id <file-id>
+gptctl assistant --create --name <name> --model <model> \
+    [--description <description>] \
+    [--instructions <instructions>] \
+    [--tools <tools, seperate by comma>] \
+    [--files <file-ids, seperate by comma>]
+gptctl assistant --list
+gptctl assistant --delete [--id <id>] [--name <name>]
+gptctl assistant --choose [--id <id>] [--name <name>]
 ```
 
 ##### Thread Commands
@@ -54,15 +58,19 @@ gptctl file --delete --id <file-id>
 ```bash
 gptctl thread --create --name <thread-name>
 gptctl thread --list
-gptctl thread --chat --id <thread-id>
+
+# begin chatting with ChatGPT,
+# if you have chosen an assistant, you can omit the assistant_id flag
+# if you have chosen a thread, you can omit the id flag
+gptctl thread --chat [--id <thread-id>] [--assistant_id <assistant-id>]
 ```
 
-##### Assistant Commands
+##### File Commands
 
 ```bash
-gptctl assistant --create --name <assistant-name>
-gptctl assistant --list
-gptctl assistant --delete --id <assistant-id>
+gptctl file --create --path <path-to-local-file>
+gptctl file --list
+gptctl file --delete --id <file-id>
 ```
 
 For more information, you can use the `--help` flag to get a description of all the available subcommands and options. 

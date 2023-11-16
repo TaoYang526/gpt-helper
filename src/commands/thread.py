@@ -1,7 +1,6 @@
 import logging
 import os.path
-from src.libopenai.thread import create, update, get_messages, chat
-from src.commands.assistant import get_assistant_id
+from src.libopenai.thread import create, delete, update, get_messages, chat
 from src.utils.common import *
 from tinydb import TinyDB, Query
 # readline should be imported to make input content to be editable.
@@ -48,12 +47,31 @@ class ThreadCommand:
             check_required_args(args, ["name"])
             metadata = json.loads(args.metadata) if args.metadata else {}
             metadata["name"] = args.name
-            thread = create(metadata=args.metadata)
+            thread = create(metadata=metadata)
             logging.info(f"created thread: {thread}")
             metadata["id"] = thread.id
             db = self.__get_db(context)
             db.insert(metadata)
+            db.close()
             logging.info(f"persisted thread in local DB, thread={metadata}")
+        elif args.delete:
+            check_required_args(args, [("id", "name")])
+            thread = self.get_thread_by_id_or_name(context, id=args.id, name=args.name)
+            if not thread:
+                exit(f"ERROR: thread {args.id} not found")
+            thread_id = thread.get('id')
+            deleted_thread = delete(thread_id=thread_id)
+            if deleted_thread:
+                logging.info(f"deleted thread: {thread}")
+            else:
+                logging.warning(f"thread {thread_id} has already been deleted")
+            db = self.__get_db(context)
+            db_to_delete = db.get(Query().id == thread_id)
+            if db_to_delete:
+                db.remove(doc_ids=[db_to_delete.doc_id])
+                logging.info(f"removed thread {thread_id} in local DB")
+            else:
+                logging.warning(f"thread {thread_id} has already been removed in local DB")
         elif args.list:
             db = self.__get_db(context)
             threads = db.all()
@@ -61,23 +79,12 @@ class ThreadCommand:
                 print(f"thread-{i+1}: {v}")
         elif args.choose:
             check_required_args(args, [("id", "name")])
-            condition = {"id": args.id} if args.id else {"name": args.name}
-            logging.info(f"choosing thread: condition={condition}")
-            db = self.__get_db(context)
-            cond = None
-            for key, value in condition.items():
-                if cond is None:
-                    cond = getattr(Query(), key) == value
-                else:
-                    cond &= getattr(Query(), key) == value
-            result = db.search(cond)
-            if len(result) == 0:
-                logging.fatal(f"thread with condition {condition} not found")
-            if len(result) > 1:
-                logging.fatal(f"multiple threads found with condition {condition}: {result}")
-            thread = result[0]
-            context.set_thread_id(thread.get('id'))
-            logging.info(f"chosen thread: {thread}")
+            thread = self.get_thread_by_id_or_name(context, id=args.id, name=args.name)
+            if thread:
+                logging.info(f"chosen thread: {thread}")
+                context.set_thread_id(thread.get('id'))
+            else:
+                exit(f"ERROR: thread {args.id} not found")
         elif args.update:
             check_required_args(args, ["metadata"])
             metadata = json.loads(args.metadata)
@@ -93,7 +100,7 @@ class ThreadCommand:
         elif args.chat:
             assistant_id = get_assistant_id(context, args)
             thread_id = get_thread_id(context, args)
-            logging.info(f"chatting via thread: {thread_id}")
+            logging.info(f"chatting via thread={thread_id} and assistant={assistant_id}")
             files_content = read_files_content_if_exists(args.files)
             while True:
                 prompt = input("You: ")
@@ -106,6 +113,33 @@ class ThreadCommand:
                     chat(assistant_id, thread_id, prompt)
                 except Exception as err:
                     logging.error(f"failed to chat: [{type(err)}] {err}, please check your network then try again later...")
+
+    def get_thread_by_id_or_name(self, context, id=None, name=None):
+        condition = {"id": id} if id else {"name": name}
+        logging.debug(f"finding thread: condition={condition}")
+        db = self.__get_db(context)
+        cond = None
+        for key, value in condition.items():
+            if cond is None:
+                cond = getattr(Query(), key) == value
+            else:
+                cond &= getattr(Query(), key) == value
+        result = db.search(cond)
+        if len(result) == 0:
+            exit(f"ERROR: thread with condition {condition} not found")
+        if len(result) > 1:
+            exit(f"ERROR: multiple threads found with condition {condition}: {result}")
+        return result[0]
+
+
+def get_assistant_id(context, args):
+    assistant_id = args.assistant_id
+    if not assistant_id:
+        assistant_id = context.get_assistant_id()
+    if not assistant_id:
+        exit("assistant id not found, please specify with --id or "
+             "choose one with --choose --name <name> before this operation.")
+    return assistant_id
 
 
 def get_thread_id(context, args):
